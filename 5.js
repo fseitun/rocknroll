@@ -1,13 +1,75 @@
 import axios from "axios";
 
-// Paso 1: Convertir la bitácora a una matriz 8x8
+async function startChallenge() {
+  try {
+    console.log("Starting the challenge...");
+    const response = await axios.post(
+      "https://makers-challenge.altscore.ai/v1/s1/e5/actions/start",
+      {},
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "API-KEY": "5000781e3339485ab9f50e25c773bc14",
+        },
+      }
+    );
+    console.log("Challenge started:", response.data);
+  } catch (error) {
+    if (
+      error.response &&
+      error.response.data.code === "ConflictError" &&
+      error.response.data.details.message ===
+        "Contestant already started the challenge"
+    ) {
+      console.log("Challenge already started, proceeding...");
+    } else {
+      console.error(
+        "Error starting the challenge:",
+        error.response ? error.response.data : error.message
+      );
+      throw error;
+    }
+  }
+}
+
+async function readRadar() {
+  try {
+    console.log("Reading radar...");
+    const response = await axios.post(
+      "https://makers-challenge.altscore.ai/v1/s1/e5/actions/perform-turn",
+      {
+        action: "radar",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "API-KEY": "5000781e3339485ab9f50e25c773bc14",
+        },
+      }
+    );
+    console.log("Radar read:", response.data);
+    return response.data.action_result;
+  } catch (error) {
+    if (error.response && error.response.status === 409) {
+      console.error("Radar read conflict:", error.response.data);
+    } else {
+      console.error(
+        "Error reading radar:",
+        error.response ? error.response.data : error.message
+      );
+    }
+    throw error;
+  }
+}
+
 function parseRadarData(radarData) {
   const rows = radarData.split("|");
-  const grid = rows.map((row) => row.match(/.{3}/g)); // Dividir cada fila en bloques de 3 caracteres
+  const grid = rows.map((row) => row.match(/.{3}/g));
   return grid;
 }
 
-// Paso 2: Determinar la posición inicial de la nave enemiga y la nave Hope
 function findPositions(grid) {
   let enemyPos = null;
   let hopePos = null;
@@ -25,39 +87,36 @@ function findPositions(grid) {
   return { enemyPos, hopePos };
 }
 
-// Paso 3: Predecir el movimiento de la nave enemiga
 function predictEnemyMovement(enemyPos, hopePos, grid) {
-  let [x, y] = enemyPos;
+  let [ex, ey] = enemyPos;
   const [hx, hy] = hopePos;
-  const path = [];
 
-  for (let turn = 0; turn < 4; turn++) {
-    if (x < hx && grid[x + 1][y].includes("$") === false) {
-      x += 1;
-    } else if (y < hy && grid[x][y + 1].includes("$") === false) {
-      y += 1;
-    } else if (x > hx && grid[x - 1][y].includes("$") === false) {
-      x -= 1;
-    } else if (y > hy && grid[x][y - 1].includes("$") === false) {
-      y -= 1;
-    }
-    path.push([x, y]);
+  // Predict based on simple movement: move towards Hope
+  if (ex < hx && grid[ex + 1][ey] !== "$") {
+    ex += 1;
+  } else if (ex > hx && grid[ex - 1][ey] !== "$") {
+    ex -= 1;
+  } else if (ey < hy && grid[ex][ey + 1] !== "$") {
+    ey += 1;
+  } else if (ey > hy && grid[ex][ey - 1] !== "$") {
+    ey -= 1;
   }
 
-  return path[path.length - 1];
+  return [ex, ey];
 }
 
-// Paso 4: Ejecutar el ataque
 async function executeAttack(finalPos) {
   const [x, y] = finalPos;
-  const attackCoordinates = String.fromCharCode(97 + y) + (x + 1);
+  const attackCoordinates = {
+    x: String.fromCharCode(97 + y), // Convert 0-7 to 'a'-'h'
+    y: x + 1, // Convert 0-7 to 1-8
+  };
 
   try {
+    console.log("Attacking position:", attackCoordinates);
     const response = await axios.post(
-      "https://makers-challenge.altscore.ai/v1/s1/e4/solution",
+      "https://makers-challenge.altscore.ai/v1/s1/e5/actions/perform-turn",
       {
-        username: "Not all those who wander", // Reemplaza con el username correcto si es necesario
-        password: "are lost", // Reemplaza con la contraseña correcta si es necesario
         action: "attack",
         attack_position: attackCoordinates,
       },
@@ -72,19 +131,31 @@ async function executeAttack(finalPos) {
 
     console.log(response.data);
   } catch (error) {
-    console.error(
-      "Error al ejecutar el ataque:",
-      error.response ? error.response.data : error.message
-    );
+    if (error.response && error.response.status === 409) {
+      console.error("Attack conflict:", error.response.data);
+    } else {
+      console.error(
+        "Error executing the attack:",
+        error.response ? error.response.data : error.message
+      );
+    }
   }
 }
 
-// Ejecución del flujo
-const radarData =
-  "a01a02a03a04a05a06a07a08|b01b02b03b04b$5b06b07b08|c01c02c03c04c05c06c07c$8|d01d02d03d04d05d06d07d08|e01e02e03e04e$5e06e^7e08|f01f02f03f04f$5f06f07f08|g01g02g03g04g05g06g07g08|h01h02h03h04h05h#6h07h08|";
+async function runChallenge() {
+  await startChallenge();
 
-const grid = parseRadarData(radarData);
-const { enemyPos, hopePos } = findPositions(grid);
-const finalPos = predictEnemyMovement(enemyPos, hopePos, grid);
+  try {
+    const radarReading1 = await readRadar(); // First radar read
+    const grid1 = parseRadarData(radarReading1);
+    const { enemyPos, hopePos } = findPositions(grid1);
 
-executeAttack(finalPos);
+    const predictedPos = predictEnemyMovement(enemyPos, hopePos, grid1);
+
+    await executeAttack(predictedPos); // Attack based on prediction
+  } catch (error) {
+    console.error("An error occurred during the challenge:", error.message);
+  }
+}
+
+runChallenge();
