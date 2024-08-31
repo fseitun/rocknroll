@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start:7": "7.js",
+    "start:7": "node 7.js",
     "start:9": "tsc && node dist/9.js"
   },
   "keywords": [],
