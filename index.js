@@ -3,7 +3,7 @@ import axios from "axios";
 const API_KEY = "5000781e3339485ab9f50e25c773bc14";
 const API_URL = "https://makers-challenge.altscore.ai/v1/s1/e8/actions/door";
 
-async function openNextDoor(cookieValue) {
+async function openNextDoor(cookieValue, onGoingString = "") {
   const currentDate = new Date();
 
   const millisecondsUntilNextMinute =
@@ -37,8 +37,11 @@ async function openNextDoor(cookieValue) {
         "utf-8"
       );
       console.log("Decoded Next Cookie Value:", decodedValue);
+      onGoingString += " " + decodedValue;
 
-      openNextDoor(gryffindorCookie);
+      console.log("On-Going String:", onGoingString);
+
+      openNextDoor(gryffindorCookie, onGoingString);
     } else {
       console.log("No more cookies to process.");
     }
