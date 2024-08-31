@@ -9,49 +9,14 @@ interface PhaseChangePoint {
   specific_volume_vapor: number;
 }
 
-const criticalPoint: PhaseChangePoint = {
-  pressure: 10, // MPa
-  specific_volume_liquid: 0.0035, // m³/kg
-  specific_volume_vapor: 0.0035, // m³/kg
-};
-
-const lowerPoint: PhaseChangePoint = {
-  pressure: 7, // MPa
-  specific_volume_liquid: 0.00105, // m³/kg
-  specific_volume_vapor: 0.0035, // m³/kg
-};
-
-function interpolate(
-  x: number,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): number {
-  return y1 + ((y2 - y1) * (x - x1)) / (x2 - x1);
-}
-
 function calculateSpecificVolumes(pressure: number): PhaseChangePoint | null {
-  if (pressure > criticalPoint.pressure || pressure < lowerPoint.pressure) {
+  // Pressure out of range
+  if (pressure > 10 || pressure < 0.05) {
     return null;
   }
 
-  const specific_volume_liquid = interpolate(
-    pressure,
-    lowerPoint.pressure,
-    lowerPoint.specific_volume_liquid,
-    criticalPoint.pressure,
-    criticalPoint.specific_volume_liquid
-  );
-
-  const specific_volume_vapor = interpolate(
-    pressure,
-    lowerPoint.pressure,
-    lowerPoint.specific_volume_vapor,
-    criticalPoint.pressure,
-    criticalPoint.specific_volume_vapor
-  );
-
+  const specific_volume_liquid = (2450 * pressure + 10325) / 9950000;
+  const specific_volume_vapor = (299999825 - 29996500 * pressure) / 9950000;
   return { pressure, specific_volume_liquid, specific_volume_vapor };
 }
 
@@ -65,12 +30,10 @@ app.get("/phase-change-diagram", (req: Request, res: Response) => {
   const data = calculateSpecificVolumes(pressure);
 
   if (!data) {
-    return res
-      .status(404)
-      .json({ error: "Pressure out of range or data not found" });
+    return res.status(404).json({ error: "Pressure out of range" });
   }
 
-  res.json({
+  res.status(200).json({
     specific_volume_liquid: data.specific_volume_liquid,
     specific_volume_vapor: data.specific_volume_vapor,
   });
